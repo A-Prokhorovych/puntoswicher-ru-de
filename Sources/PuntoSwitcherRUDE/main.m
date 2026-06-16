@@ -7,11 +7,10 @@ static const UInt32 kHotKeySignature = 'RUDE';
 static const UInt32 kHotKeyID = 1;
 static const UInt32 kDefaultHotKeyModifiers = cmdKey | optionKey;
 static const UInt32 kDefaultHotKeyCode = 49;
-static const char *kAppVersion = "0.7-toggle-selection-case";
+static const char *kAppVersion = "0.8-caret-case-hotkey";
 
 static const CGKeyCode kKeyC = 8;
 static const CGKeyCode kKeyV = 9;
-static const CGKeyCode kKeyY = 16;
 static const CGKeyCode kKeyDelete = 51;
 static const CGKeyCode kKeyCommand = 55;
 static const CGKeyCode kKeyLeft = 123;
@@ -644,7 +643,8 @@ static CGEventRef SingleKeyHandler(CGEventTapProxy proxy, CGEventType type, CGEv
 
     CGKeyCode keyCode = (CGKeyCode)CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
     CGEventFlags flags = CGEventGetFlags(event);
-    BOOL caseHotkeyMatches = keyCode == kKeyY && EventFlagsEqualMasks(flags, kCGEventFlagMaskCommand | kCGEventFlagMaskShift);
+    BOOL caseHotkeyMatches = (keyCode == gHotKey.keyCode || keyCode == gHotKey.alternateKeyCode) &&
+                             EventFlagsEqualMasks(flags, kCGEventFlagMaskCommand | kCGEventFlagMaskShift);
     if (caseHotkeyMatches) {
         DebugLog(@"case hotkey keyCode=%u flags=%llu", keyCode, (unsigned long long)flags);
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
@@ -798,7 +798,7 @@ int main(int argc, const char *argv[]) {
             printf("PuntoSwitcher RU-DE\n");
             printf("Запуск: ./.build/puntoswicher-ru-de [--hotkey 'cmd+^']\n");
             printf("Примеры хоткеев: cmd+^, cmd+ё, ctrl+^, ctrl+ё, ctrl+space\n");
-            printf("Регистр выделения: Cmd+Shift+Y\n");
+            printf("Регистр выделения: Cmd+Shift+^ / Cmd+Shift+ё\n");
             printf("Тест регистра: ./.build/puntoswicher-ru-de --toggle-case Привет\n");
             printf("Диагностика клавиш: ./.build/puntoswicher-ru-de --listen-keycodes\n");
             printf("Тест прямого ввода: ./.build/puntoswicher-ru-de --type привет\n");
