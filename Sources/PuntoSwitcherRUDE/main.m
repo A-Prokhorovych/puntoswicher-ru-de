@@ -7,10 +7,11 @@ static const UInt32 kHotKeySignature = 'RUDE';
 static const UInt32 kHotKeyID = 1;
 static const UInt32 kDefaultHotKeyModifiers = cmdKey | optionKey;
 static const UInt32 kDefaultHotKeyCode = 49;
-static const char *kAppVersion = "0.6-switch-layout";
+static const char *kAppVersion = "0.7-toggle-selection-case";
 
 static const CGKeyCode kKeyC = 8;
 static const CGKeyCode kKeyV = 9;
+static const CGKeyCode kKeyY = 16;
 static const CGKeyCode kKeyDelete = 51;
 static const CGKeyCode kKeyCommand = 55;
 static const CGKeyCode kKeyLeft = 123;
@@ -31,6 +32,7 @@ static NSMutableString *gLastWord = nil;
 static BOOL gDebug = NO;
 
 static void FixPreviousWord(void);
+static void ToggleSelectionCase(void);
 static void ScheduleFixAttempt(int attempt);
 
 static void DebugLog(NSString *format, ...) {
@@ -109,6 +111,11 @@ static CGEventFlags RequiredEventFlags(UInt32 modifiers) {
 
 static BOOL EventFlagsMatch(CGEventFlags eventFlags, UInt32 modifiers) {
     CGEventFlags required = RequiredEventFlags(modifiers);
+    CGEventFlags relevant = kCGEventFlagMaskControl | kCGEventFlagMaskAlternate | kCGEventFlagMaskShift | kCGEventFlagMaskCommand;
+    return (eventFlags & relevant) == required;
+}
+
+static BOOL EventFlagsEqualMasks(CGEventFlags eventFlags, CGEventFlags required) {
     CGEventFlags relevant = kCGEventFlagMaskControl | kCGEventFlagMaskAlternate | kCGEventFlagMaskShift | kCGEventFlagMaskCommand;
     return (eventFlags & relevant) == required;
 }
@@ -493,6 +500,56 @@ static void PasteString(NSString *string, NSDictionary<NSPasteboardType, NSData 
     RestoreClipboard(pasteboard, snapshot);
 }
 
+static NSString *ToggleCaseString(NSString *input) {
+    NSMutableString *output = [NSMutableString string];
+    [input enumerateSubstringsInRange:NSMakeRange(0, input.length)
+                              options:NSStringEnumerationByComposedCharacterSequences
+                           usingBlock:^(NSString *substring, NSRange substringRange, NSRange enclosingRange, BOOL *stop) {
+        NSString *lower = substring.lowercaseString;
+        NSString *upper = substring.uppercaseString;
+
+        if (![substring isEqualToString:upper] && [substring isEqualToString:lower]) {
+            [output appendString:upper];
+        } else if (![substring isEqualToString:lower] && [substring isEqualToString:upper]) {
+            [output appendString:lower];
+        } else {
+            [output appendString:substring];
+        }
+    }];
+    return output;
+}
+
+static void ToggleSelectionCase(void) {
+    if (gFixInProgress) return;
+    gFixInProgress = YES;
+
+    NSPasteboard *pasteboard = NSPasteboard.generalPasteboard;
+    NSDictionary<NSPasteboardType, NSData *> *snapshot = ClipboardSnapshot(pasteboard);
+
+    [pasteboard clearContents];
+    PressCommandShortcut(kKeyC);
+
+    NSString *selection = nil;
+    for (int attempt = 0; attempt < 30; attempt++) {
+        usleep(30000);
+        selection = [pasteboard stringForType:NSPasteboardTypeString];
+        if (selection.length) break;
+    }
+
+    if (!selection.length) {
+        DebugLog(@"case toggle abort: no selection");
+        RestoreClipboard(pasteboard, snapshot);
+        gFixInProgress = NO;
+        return;
+    }
+
+    NSString *replacement = ToggleCaseString(selection);
+    DebugLog(@"case toggle selection='%@' replacement='%@'", selection, replacement);
+    PasteString(replacement, snapshot);
+    ResetLastWord();
+    gFixInProgress = NO;
+}
+
 static void FixPreviousWord(void) {
     if (gFixInProgress) return;
     gFixInProgress = YES;
@@ -587,6 +644,15 @@ static CGEventRef SingleKeyHandler(CGEventTapProxy proxy, CGEventType type, CGEv
 
     CGKeyCode keyCode = (CGKeyCode)CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
     CGEventFlags flags = CGEventGetFlags(event);
+    BOOL caseHotkeyMatches = keyCode == kKeyY && EventFlagsEqualMasks(flags, kCGEventFlagMaskCommand | kCGEventFlagMaskShift);
+    if (caseHotkeyMatches) {
+        DebugLog(@"case hotkey keyCode=%u flags=%llu", keyCode, (unsigned long long)flags);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+            ToggleSelectionCase();
+        });
+        return NULL;
+    }
+
     BOOL keyMatches = keyCode == gHotKey.keyCode || keyCode == gHotKey.alternateKeyCode;
 
     if (keyMatches && EventFlagsMatch(flags, gHotKey.modifiers)) {
@@ -693,6 +759,12 @@ int main(int argc, const char *argv[]) {
             return 0;
         }
 
+        if (argc == 3 && strcmp(argv[1], "--toggle-case") == 0) {
+            NSString *input = [NSString stringWithUTF8String:argv[2]];
+            printf("%s\n", ToggleCaseString(input).UTF8String);
+            return 0;
+        }
+
         if (argc == 3 && strcmp(argv[1], "--type") == 0) {
             if (!CheckAccessibility()) return 1;
             NSString *input = [NSString stringWithUTF8String:argv[2]];
@@ -726,6 +798,8 @@ int main(int argc, const char *argv[]) {
             printf("PuntoSwitcher RU-DE\n");
             printf("Запуск: ./.build/puntoswicher-ru-de [--hotkey 'cmd+^']\n");
             printf("Примеры хоткеев: cmd+^, cmd+ё, ctrl+^, ctrl+ё, ctrl+space\n");
+            printf("Регистр выделения: Cmd+Shift+Y\n");
+            printf("Тест регистра: ./.build/puntoswicher-ru-de --toggle-case Привет\n");
             printf("Диагностика клавиш: ./.build/puntoswicher-ru-de --listen-keycodes\n");
             printf("Тест прямого ввода: ./.build/puntoswicher-ru-de --type привет\n");
             printf("Тест с задержкой: ./.build/puntoswicher-ru-de --type-after 3 привет\n");
