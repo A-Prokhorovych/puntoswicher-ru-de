@@ -11,6 +11,53 @@ chmod +x build.sh
 ./.build/puntoswicher-ru-de --hotkey 'cmd+^'
 ```
 
+`build.sh` также собирает menu bar приложение:
+
+```text
+dist/PuntoSwitcherRUDE.app
+```
+
+## Install On Another Mac
+
+Copy the project folder to the Mac and run:
+
+```bash
+cd puntoswicher-ru-de
+./install.sh
+```
+
+The installer:
+
+- builds `PuntoSwitcherRUDE.app`;
+- copies it to `~/Applications`;
+- adds autostart via `~/Library/LaunchAgents/com.andreyprokhorovich.puntoswicher-rude.plist`;
+- starts the app immediately.
+
+If hotkeys do not work, grant Accessibility permission to `PuntoSwitcher RU-DE`:
+
+```text
+System Settings -> Privacy & Security -> Accessibility
+```
+
+## Uninstall
+
+```bash
+cd puntoswicher-ru-de
+./uninstall.sh
+```
+
+The uninstaller removes the LaunchAgent and deletes the app from `~/Applications`.
+
+## Menu Bar
+
+The app runs as a menu bar item named `RU-DE`, without a Dock icon. Click it to see English help:
+
+```text
+Cmd+^ / Cmd+ё: convert last typed word
+Cmd+Shift+^ / Cmd+Shift+ё: toggle selected text case
+Quit PuntoSwitcher RU-DE
+```
+
 Можно выбрать свою комбинацию:
 
 ```bash

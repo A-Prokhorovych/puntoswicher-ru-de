@@ -751,6 +751,71 @@ static void InstallHotKey(HotKeyConfig config) {
     InstallEventHandler(GetApplicationEventTarget(), HotKeyHandler, 1, &eventType, NULL, NULL);
 }
 
+@interface StatusMenuDelegate : NSObject <NSApplicationDelegate>
+@property(strong) NSStatusItem *statusItem;
+@end
+
+@implementation StatusMenuDelegate
+
+- (void)applicationDidFinishLaunching:(NSNotification *)notification {
+    self.statusItem = [NSStatusBar.systemStatusBar statusItemWithLength:NSVariableStatusItemLength];
+    self.statusItem.button.title = @"RU-DE";
+    self.statusItem.button.toolTip = @"PuntoSwitcher RU-DE";
+
+    NSMenu *menu = [[NSMenu alloc] initWithTitle:@"PuntoSwitcher RU-DE"];
+
+    NSMenuItem *title = [[NSMenuItem alloc] initWithTitle:@"PuntoSwitcher RU-DE" action:nil keyEquivalent:@""];
+    title.enabled = NO;
+    [menu addItem:title];
+
+    NSMenuItem *version = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Version %s", kAppVersion] action:nil keyEquivalent:@""];
+    version.enabled = NO;
+    [menu addItem:version];
+    [menu addItem:NSMenuItem.separatorItem];
+
+    NSArray<NSString *> *hints = @[
+        @"Cmd+^ / Cmd+ё: convert last typed word",
+        @"Cmd+Shift+^ / Cmd+Shift+ё: toggle selected text case",
+        @"After conversion, the keyboard layout switches to the inserted language.",
+        @"Grant Accessibility permission if hotkeys do not work.",
+        @"Terminal install: ./install.sh",
+        @"Terminal uninstall: ./uninstall.sh"
+    ];
+
+    for (NSString *hint in hints) {
+        NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:hint action:nil keyEquivalent:@""];
+        item.enabled = NO;
+        [menu addItem:item];
+    }
+
+    [menu addItem:NSMenuItem.separatorItem];
+    NSMenuItem *quit = [[NSMenuItem alloc] initWithTitle:@"Quit PuntoSwitcher RU-DE" action:@selector(terminate:) keyEquivalent:@"q"];
+    quit.target = NSApp;
+    [menu addItem:quit];
+
+    self.statusItem.menu = menu;
+}
+
+@end
+
+static void RunMenuBarApplication(HotKeyConfig hotKey) {
+    if (!CheckAccessibility()) return;
+    InstallHotKey(hotKey);
+
+    NSApplication *application = NSApplication.sharedApplication;
+    application.activationPolicy = NSApplicationActivationPolicyAccessory;
+    StatusMenuDelegate *delegate = [StatusMenuDelegate new];
+    application.delegate = delegate;
+
+    printf("PuntoSwitcher RU-DE started.\n");
+    printf("Version: %s\n", kAppVersion);
+    printf("Layout hotkey: %s\n", hotKey.displayName.UTF8String);
+    printf("Case hotkey: Cmd+Shift+^ / Cmd+Shift+ё\n");
+    printf("Use the menu bar item to view help or quit.\n");
+
+    [application run];
+}
+
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
         if (argc == 3 && strcmp(argv[1], "--convert") == 0) {
@@ -833,15 +898,7 @@ int main(int argc, const char *argv[]) {
             }
         }
 
-        if (!CheckAccessibility()) return 1;
-        InstallHotKey(hotKey);
-
-        printf("PuntoSwitcher RU-DE запущен.\n");
-        printf("Версия: %s\n", kAppVersion);
-        printf("Хоткей: %s. Он исправляет последнее слово слева от курсора.\n", hotKey.displayName.UTF8String);
-        printf("Для выхода нажми Ctrl+C в этом терминале.\n");
-
-        [[NSRunLoop mainRunLoop] run];
+        RunMenuBarApplication(hotKey);
     }
     return 0;
 }
